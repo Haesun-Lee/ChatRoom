@@ -1,58 +1,52 @@
 import socket
 import threading
 import sys 
-import select
 
-print("Please enter a user name: ")
-username = sys.stdin.readline()
- 
-def chat_client():
-    if(len(sys.argv) < 3) :
-        print ('Usage : python chat_client.py hostname port')
-        sys.exit()
+nickname = input("Choose Your Name:")
+password = input("Enter Password:")
 
-    host = sys.argv[1]
-    port = int(sys.argv[2])
-     
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(2)
-    
-    # connect to remote host
-    try :
-        s.connect((host, port))
-    except :
-        print ('Unable to connect')
-        sys.exit()
-    print ('Connected to remote host. You can enter the string to check : : :')
-    # sending dummy test to initaiate a chat
-    s.send(' ')
-     
-    while 1:
-        socket_list = [sys.stdin, s]
-         
-        # Get the list sockets which are readable
-        read_sockets, write_sockets, error_sockets = select.select(socket_list , [], [])
-         
-        for sock in read_sockets:            
-            if sock == s:
-                # incoming message from remote server, s
-                data = sock.recv(4096)
-                if not data :
-                    print ('\nDisconnected from chat server')
-                    sys.exit()
-                else :
-                    #print data
-                    sys.stdout.write(data)
-                    sys.stdout.write('\n'); #changes
-                    sys.stdout.flush()     
-            
-            else :
-                # user entered a message
-                msg = sys.stdin.readline()
-                s.send(username+'\b'+'>>'+msg)
-                #sys.stdout.write('Enter String : '); #ch
-                sys.stdout.flush() 
+client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#Connect to a host
+client.connect(('127.0.0.1',5555))
 
-if __name__ == "__main__":
+stop_thread = False
 
-    sys.exit(chat_client())
+def recieve():
+    while True:
+        global stop_thread
+        if stop_thread:
+            break    
+        try:
+            message = client.recv(1024).decode('ascii')
+            if message == 'NICK':
+                client.send(nickname.encode('ascii'))
+                next_message = client.recv(1024).decode('ascii')
+                if next_message == 'PASS':
+                    client.send(password.encode('ascii'))
+                    if client.recv(1024).decode('ascii') == 'REFUSE':
+                        print("Connection is Refused !! Wrong Password")
+                        stop_thread = True
+            else:
+                print(message)
+        except:
+            print('Error Occured while Connecting')
+            client.close()
+            break
+        
+def write():
+    while True:
+        if stop_thread:
+            break
+        #Getting Messages
+        message = f'{nickname}: {input("")}'
+        client.send(message.encode('ascii'))
+
+recieve_thread = threading.Thread(target=recieve)
+recieve_thread.start()
+write_thread = threading.Thread(target=write)
+write_thread.start()
+
+
+#if __name__ == "__main__":
+
+#    sys.exit(chat_client())

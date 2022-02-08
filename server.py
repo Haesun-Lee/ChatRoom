@@ -3,83 +3,74 @@ import threading
 import sys 
 import select
 
-HOST = ''
-SOCKET_LIST = []
-RECV_BUFFER = 4096 
-PORT = 9099
-sock_list = []
-stored = []
+host = "127.0.0.1"
+port = 5555 # Choose any random port which is not so common (like 80)
 
-def chat_server():
+server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#Bind the server to IP Address
+server.bind((host, port))
+#Start Listening Mode
+server.listen()
+#List to contain the Clients getting connected and nicknames
+clients = []
+nicknames = []
 
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server_socket.bind((HOST, PORT))
-    server_socket.listen(10)
+#Broadcasting Method
+def broadcast(message):
+    for client in clients:
+        client.send(message)
+
+# Recieving Messages from client then broadcasting
+def handle(client):
+    while True:
+        try:
+            msg = message = client.recv(1024)  
+            broadcast(message)   # As soon as message recieved, broadcast it.
+        
+        except:
+            if client in clients:
+                index = clients.index(client)
+                #Index is used to remove client from list after getting diconnected
+                client.remove(client)
+                client.close
+                nickname = nicknames[index]
+                broadcast(f'{nickname} left the Chat!'.encode('ascii'))
+                nicknames.remove(nickname)
+                break
+
+# Main Recieve method
+def recieve():
+    while True:
+        client, address = server.accept()
+        print(f"Connected with {str(address)}")
+        # Ask the clients for Nicknames
+        client.send('NICK'.encode('ascii'))
+        nickname = client.recv(1024).decode('ascii')
+        client.send('PASS'.encode('ascii'))
+        password = client.recv(1024).decode('ascii')
+        # I know it is lame, but my focus is mainly for Chat system and not a Login System
+        if password != '1234':
+            client.send('REFUSE'.encode('ascii'))
+            client.close()
+            continue
+
+        nicknames.append(nickname)
+        clients.append(client)
+
+        print(f'Nickname of the client is {nickname}')
+        broadcast(f'{nickname} joined the Chat'.encode('ascii'))
+        client.send('Connected to the Server!'.encode('ascii'))
+
+        # Handling Multiple Clients Simultaneously
+        thread = threading.Thread(target=handle, args=(client,))
+        thread.start()
+
+
+#Calling the main method
+print('Server is Listening ...')
+recieve()
+
  
-    # add server socket object to the list of readable connections
-    SOCKET_LIST.append(server_socket)
- 
-    print ("Client chat started on "+ str(PORT))
- 
-    while 1:
-        ready_to_read,ready_to_write,in_error = select.select(SOCKET_LIST,[],[],0)
-        for sock in ready_to_read:
+#if __name__ == "__main__":
 
-            # a new connection request recieved
-            if sock == server_socket: 
-                sockfd, addr = server_socket.accept()
-                SOCKET_LIST.append(sockfd)
-                print ("Client (%s, %s) connected" % addr)
-                 
-                #reply(server_socket, sockfd, "[%s:%s] entered our palindrome checker\n" % addr)
-             
-            # a message from a client, not a new connection
-            else:
-                if sock not in sock_list:
-                    sock_list.append(sock)
-                    for text in stored:
-                        reply(server_socket,sock,text+'\n')
-
-                try:
-                    # receiving data from the socket.
-                    data = sock.recv(RECV_BUFFER)
-                    if data:
-                        stored.append(data)
-                        for x in sock_list:
-                            if( x != sock ):
-                                reply(server_socket, x,data)
-                    else:
-                        # remove the socket that's broken    
-                        if sock in SOCKET_LIST:
-                            SOCKET_LIST.remove(sock)
-
-                        # at this stage, no data means probably the connection has been broken
-                        reply(server_socket, sock, "Client (%s, %s) is offline\n" % addr) 
-
-                # exception 
-                except:
-                    reply(server_socket, sock, "Client (%s, %s) is offline\n" % addr)
-                    continue
-
-    server_socket.close()
-    
-
-def reply (server_socket, sock, message):
-    # for socket in SOCKET_LIST:
-    socket=sock
-        # send the message only to peer
-    if socket != server_socket:
-        try :
-            message=message.strip()
-            socket.send(message+'\n')
-        except :
-                # broken socket connection
-            socket.close()
-                # broken socket, remove it
-            if socket in SOCKET_LIST:
-                SOCKET_LIST.remove(socket)
- 
-if __name__ == "__main__":
-
-    sys.exit(chat_server())
+#    sys.exit(chat_server())
