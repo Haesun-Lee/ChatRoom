@@ -7,15 +7,13 @@ host = "127.0.0.1"
 port = 5555 # Choose any random port which is not so common (like 80)
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#Bind the server to IP Address
 server.bind((host, port))
-#Start Listening Mode
-server.listen()
-#List to contain the Clients getting connected and nicknames
+server.listen() # listening mode starts
+
 clients = []
 nicknames = []
 
-#Broadcasting Method
+
 def broadcast(message):
     for client in clients:
         client.send(message)
@@ -48,7 +46,6 @@ def recieve():
         nickname = client.recv(1024).decode('ascii')
         client.send('PASS'.encode('ascii'))
         password = client.recv(1024).decode('ascii')
-        # I know it is lame, but my focus is mainly for Chat system and not a Login System
         if password != '1234':
             client.send('REFUSE'.encode('ascii'))
             client.close()
@@ -61,7 +58,7 @@ def recieve():
         broadcast(f'{nickname} joined the Chat'.encode('ascii'))
         client.send('Connected to the Server!'.encode('ascii'))
 
-        # Handling Multiple Clients Simultaneously
+        # Handling Multiple Clients
         thread = threading.Thread(target=handle, args=(client,))
         thread.start()
 
