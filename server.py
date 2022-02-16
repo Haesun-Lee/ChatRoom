@@ -1,73 +1,127 @@
-import socket
-import threading
-import sys 
-import select
+import socket, select
+from datetime import datetime
+from datetime import timedelta
 
-host = "127.0.0.1"
-port = 5555 # Choose any random port which is not so common (like 80)
+SAD = ":("
+TIME = ":mytime"
+PLUS_HOUR = "+1hr"
 
-server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.bind((host, port))
-server.listen() # listening mode starts
-
-clients = []
-nicknames = []
-
-
-def broadcast(message):
-    for client in clients:
-        client.send(message)
-
-# Recieving Messages from client then broadcasting
-def handle(client):
-    while True:
-        try:
-            msg = message = client.recv(1024)  
-            broadcast(message)   # As soon as message recieved, broadcast it.
-        
-        except:
-            if client in clients:
-                index = clients.index(client)
-                #Index is used to remove client from list after getting diconnected
-                client.remove(client)
-                client.close
-                nickname = nicknames[index]
-                broadcast(f'{nickname} left the Chat!'.encode('ascii'))
-                nicknames.remove(nickname)
-                break
-
-# Main Recieve method
-def recieve():
-    while True:
-        client, address = server.accept()
-        print(f"Connected with {str(address)}")
-        # Ask the clients for Nicknames
-        client.send('NICK'.encode('ascii'))
-        nickname = client.recv(1024).decode('ascii')
-        client.send('PASS'.encode('ascii'))
-        password = client.recv(1024).decode('ascii')
-        if password != '1234':
-            client.send('REFUSE'.encode('ascii'))
-            client.close()
-            continue
-
-        nicknames.append(nickname)
-        clients.append(client)
-
-        print(f'Nickname of the client is {nickname}')
-        broadcast(f'{nickname} joined the Chat'.encode('ascii'))
-        client.send('Connected to the Server!'.encode('ascii'))
-
-        # Handling Multiple Clients
-        thread = threading.Thread(target=handle, args=(client,))
-        thread.start()
+# broadcast function
+def send_to_all (sock, message):
+	for socket in connected_list:	# messages will be sent to other clients
+		if socket != server_socket and socket != sock :
+			try :
+				socket.send(message)
+			except :
+				# if connection == false
+				socket.close()
+				connected_list.remove(socket)
 
 
-#Calling the main method
-print('Server is Listening ...')
-recieve()
+if __name__ == "__main__":
+	name="" # username
+	record={} # username record to avoid duplication
+	connected_list = [] # connected user list
+	buffer = 4096
+	port = 5001
 
- 
-#if __name__ == "__main__":
+	server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-#    sys.exit(chat_server())
+	server_socket.bind(("localhost", port))
+	server_socket.listen(10) # clients can connect up to 10 connections
+	connected_list.append(server_socket)
+
+	print "*************************Listening for the clients*************************" 
+
+	while 1:
+        # Get the list sockets which are ready 
+		rList,wList,error_sockets = select.select(connected_list,[],[])
+
+		for sock in rList:
+			# new connection starrts
+			if sock == server_socket: 
+				# Handle the case in which there is a new connection recieved through server_socket
+				sockfd, addr = server_socket.accept()
+				name=sockfd.recv(buffer)
+				connected_list.append(sockfd)
+				record[addr]=""
+				#print "record and conn list ",record,connected_list
+                
+                # check username duplication
+				if name in record.values():
+					sockfd.send("\r Username already exist! Try using other username! \n")
+					del record[addr]
+					connected_list.remove(sockfd)
+					sockfd.close()
+					continue
+				else:
+                    #add name and address
+					record[addr]=name
+					print "Client (%s, %s) connected" % addr," [",record[addr],"]"
+					sockfd.send("\rWelcome to chat room.\n"+ "* Enter 'Exit' to leave the chatroom\n"+"* Use ':)' to send [feel happy] and ':(' to send [feel sad]\n"+"* Use ':mytime' to send the current time and '+1hr' to send current time + 1hour\n")
+					send_to_all(sockfd, "\r "+name+" joined the conversation \n")
+
+			#Some incoming message from a client
+			else:
+				# Data from client
+				try:
+					data1 = sock.recv(buffer)
+					data=data1[:data1.index("\n")]
+                    
+                    #get addr of client sending the message
+					i,p=sock.getpeername()
+					if data == "Exit":
+						msg="\r "+record[(i,p)]+" left the conversation \n"
+						send_to_all(sock,msg)
+						print "Client (%s, %s) is offline" % (i,p)," [",record[(i,p)],"]"
+						del record[(i,p)]
+						connected_list.remove(sock)
+						sock.close()
+						continue
+  
+					elif data == ":)":
+						msg="\r"+record[(i,p)]+" : "+"[feeling happy]\n"
+						send_to_all(sock,msg)
+						continue
+  
+					elif data == ":)":
+						msg="\r"+record[(i,p)]+" : "+"[feeling happy]\n"
+						send_to_all(sock,msg)
+						continue
+  
+					elif data == SAD:
+						msg="\r"+record[(i,p)]+" : "+"[feeling sad]\n"
+						send_to_all(sock,msg)
+						continue
+                        #print"1"
+					elif data == TIME:
+						now = datetime.now()
+						current_time = now.strftime("%H:%M:%S")
+						msg="\r"+record[(i,p)]+" : "+current_time +"\n"
+						send_to_all(sock,msg)
+						continue
+					
+					elif data == PLUS_HOUR:
+						now = datetime.now()+timedelta(hours=1)
+						current_time = now.strftime("%H:%M:%S")
+						msg="\r"+record[(i,p)]+" : "+current_time +"\n"
+						send_to_all(sock,msg)
+						continue
+            
+  
+					else:
+						msg="\r "+record[(i,p)]+": "+data+"\n"
+						send_to_all(sock,msg)
+            
+                #abrupt user exit
+				except:
+					(i,p)=sock.getpeername()
+					send_to_all(sock, "\r"+record[(i,p)]+" left the conversation unexpectedly\n")
+					print "Client (%s, %s) is offline (error)" % (i,p)," [",record[(i,p)],"]\n"
+					del record[(i,p)]
+					connected_list.remove(sock)
+					sock.close()
+					continue
+
+	server_socket.close()
+
