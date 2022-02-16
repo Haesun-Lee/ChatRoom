@@ -1,52 +1,58 @@
-import socket
-import threading
-import sys 
+import socket, select, string, sys
 
-nickname = input("Choose Your Name:")
-password = input("Enter Password:")
 
-client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#Connect to a host
-client.connect(('127.0.0.1',5555))
+def display(name) :
+	you=name +" : "
+	sys.stdout.write(you)
+	sys.stdout.flush()
 
-stop_thread = False
+def main():
 
-def recieve():
-    while True:
-        global stop_thread
-        if stop_thread:
-            break    
-        try:
-            message = client.recv(1024).decode('ascii')
-            if message == 'NICK':
-                client.send(nickname.encode('ascii'))
-                next_message = client.recv(1024).decode('ascii')
-                if next_message == 'PASS':
-                    client.send(password.encode('ascii'))
-                    if client.recv(1024).decode('ascii') == 'REFUSE':
-                        print("Connection is Refused !! Wrong Password")
-                        stop_thread = True
-            else:
-                print(message)
-        except:
-            print('Error Occured while Connecting')
-            client.close()
-            break
+    if len(sys.argv)<2:
+        host = raw_input("Enter host ip address: ")
+    else:
+        host = sys.argv[1]
+
+    port = 5001
+    
+    # enter user name!
+    name=raw_input("Enter username: ")
+    password = input("Enter Password:")
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(2)
+    
+    # connecting to the server host
+    try :
+        s.connect((host, port))
+    except :
+        print "Server connection fail"
+        sys.exit()
+
+    #if connection == true
+    s.send(name)
+    display(name)
+    while 1:
+        socket_list = [sys.stdin, s]
         
-def write():
-    while True:
-        if stop_thread:
-            break
-        #Getting Messages 
-        message = f'{nickname}: {input("")}'
-        client.send(message.encode('ascii'))
+        # Get the list of sockets which are readable
+        rList, wList, error_list = select.select(socket_list , [], [])
+        
+        for sock in rList:
+            # data from the server
+            if sock == s:
+                data = sock.recv(4096)
+                if not data :
+                    print ' \r disconnected from the server\n '
+                    sys.exit()
+                else :
+                    sys.stdout.write(data)
+                    display(name)
+        
+            #user entered a message
+            else :
+                msg=sys.stdin.readline()
+                s.send(msg)
+                display(name)
 
-recieve_thread = threading.Thread(target=recieve)
-recieve_thread.start()
-write_thread = threading.Thread(target=write)
-write_thread.start()
-
-
-#if __name__ == "__main__":
-
-#    sys.exit(chat_client())
+if __name__ == "__main__":
+    main()
