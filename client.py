@@ -17,19 +17,23 @@ def main():
     
     # enter user name!
     name=raw_input("Enter username: ")
-    password = input("Enter Password:")
+    password = raw_input("Enter Password:")
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.settimeout(2)
     
     # connecting to the server host
     try :
         s.connect((host, port))
+        #print"d"
     except :
         print "Server connection fail"
         sys.exit()
 
     #if connection == true
     s.send(name)
+    s.send("@")
+    s.send(password)
+    #print password
     display(name)
     while 1:
         socket_list = [sys.stdin, s]
@@ -42,6 +46,9 @@ def main():
             if sock == s:
                 data = sock.recv(4096)
                 if not data :
+                    print ' \r disconnected from the server\n '
+                    sys.exit()
+                elif data == "INCORRECT":
                     print ' \r disconnected from the server\n '
                     sys.exit()
                 else :
