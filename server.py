@@ -2,10 +2,11 @@ import socket, select
 from datetime import datetime
 from datetime import timedelta
 
+EXIT = ":Exit"
+HAPPY = ":)"
 SAD = ":("
 TIME = ":mytime"
-PLUS_HOUR = "+1hr"
-
+PLUS_HOUR = ":+1hr"
 # broadcast function
 def send_to_all (sock, message):
 	for socket in connected_list:	# messages will be sent to other clients
@@ -20,7 +21,10 @@ def send_to_all (sock, message):
 
 if __name__ == "__main__":
 	name="" # username
-	record={} # username record to avoid duplication
+	userpassword = ""
+	password = []
+	chatroom_password = "1234"
+ 	record={} # username record to avoid duplication
 	connected_list = [] # connected user list
 	buffer = 4096
 	port = 5001
@@ -43,6 +47,11 @@ if __name__ == "__main__":
 				# Handle the case in which there is a new connection recieved through server_socket
 				sockfd, addr = server_socket.accept()
 				name=sockfd.recv(buffer)
+				print name
+				password = name.split('@')
+				print password
+				name = password[0]
+				userpassword = password[1]
 				connected_list.append(sockfd)
 				record[addr]=""
 				#print "record and conn list ",record,connected_list
@@ -57,10 +66,28 @@ if __name__ == "__main__":
 				else:
                     #add name and address
 					record[addr]=name
-					print "Client (%s, %s) connected" % addr," [",record[addr],"]"
-					sockfd.send("\rWelcome to chat room.\n"+ "* Enter 'Exit' to leave the chatroom\n"+"* Use ':)' to send [feel happy] and ':(' to send [feel sad]\n"+"* Use ':mytime' to send the current time and '+1hr' to send current time + 1hour\n")
-					send_to_all(sockfd, "\r "+name+" joined the conversation \n")
-
+					#password=sockfd.recv(buffer)
+					#print password
+					if len(userpassword)>5:
+						sockfd.send("\r The passcode is restricted to a maximum of 5 alpha-numeric characters only. \n")
+						del record[addr]
+						connected_list.remove(sockfd)
+						sockfd.close()
+						continue
+					if userpassword == chatroom_password:
+						print "input password : " + userpassword
+						print "Client (%s, %s) connected" % addr," [",record[addr],"]"
+						print "Password correct!! "+password[0]+" joined the chat room!"
+						sockfd.send("\rWelcome to chat room.\n"+ "* Enter ':Exit' to leave the chatroom\n"+"* Use ':)' to send [feel happy] and ':(' to send [feel sad]\n"+"* Use ':mytime' to send the current time and ':+1hr' to send current time + 1hour\n")
+						send_to_all(sockfd, "\r "+name+" joined the conversation \n")
+					else:
+						print "password incorrect!! Closing the chatroom"
+						sockfd.send("INCORRECT")
+						continue
+						
+      					
+  
+  
 			#Some incoming message from a client
 			else:
 				# Data from client
@@ -70,7 +97,7 @@ if __name__ == "__main__":
                     
                     #get addr of client sending the message
 					i,p=sock.getpeername()
-					if data == "Exit":
+					if data == EXIT:
 						msg="\r "+record[(i,p)]+" left the conversation \n"
 						send_to_all(sock,msg)
 						print "Client (%s, %s) is offline" % (i,p)," [",record[(i,p)],"]"
@@ -79,12 +106,7 @@ if __name__ == "__main__":
 						sock.close()
 						continue
   
-					elif data == ":)":
-						msg="\r"+record[(i,p)]+" : "+"[feeling happy]\n"
-						send_to_all(sock,msg)
-						continue
-  
-					elif data == ":)":
+					elif data == HAPPY:
 						msg="\r"+record[(i,p)]+" : "+"[feeling happy]\n"
 						send_to_all(sock,msg)
 						continue
