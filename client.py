@@ -1,4 +1,6 @@
-import socket, select, string, sys
+import socket, select, string, sys, argparse
+
+
 
 
 def display(name) :
@@ -7,33 +9,54 @@ def display(name) :
 	sys.stdout.flush()
 
 def main():
+    
+    #if len(sys.argv)<2:
+        #host = input("Enter host ip address: ")
+    #else:
+        #host = sys.argv[1]
+    
 
-    if len(sys.argv)<2:
-        host = raw_input("Enter host ip address: ")
-    else:
-        host = sys.argv[1]
-
-    port = 5001
+    #port = 5001
     
     # enter user name!
-    name=raw_input("Enter username: ")
-    password = raw_input("Enter Password:")
+    #name=input("Enter username: ")
+    #password = input("Enter Password:")
+    
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-join', action="store_true")
+    parser.add_argument('-host')
+    parser.add_argument('-port')
+    parser.add_argument('-username')
+    parser.add_argument('-passcode')
+    args = parser.parse_args()
+
+    host = args.host
+    port = args.port
+    name = args.username
+    password = args.passcode
+
+    print(host + port + name + password)
+    
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.settimeout(2)
     
     # connecting to the server host
     try :
-        s.connect((host, port))
-        #print"d"
+        #print("testing try")
+        s.connect((host, int(port)))
+        
     except :
-        print "Server connection fail"
+        print ("Server connection fail")
         sys.exit()
 
+    name = name + "@" + password 
     #if connection == true
-    s.send(name)
-    s.send("@")
-    s.send(password)
-    #print password
+    s.send(name.encode("utf-8"))
+    print(name)
+    #s.sendall(b"@")
+    #s.send(password.encode("utf-8"))
+    #print(password)
     display(name)
     while 1:
         socket_list = [sys.stdin, s]
@@ -44,12 +67,12 @@ def main():
         for sock in rList:
             # data from the server
             if sock == s:
-                data = sock.recv(4096)
+                data = sock.recv(4096).decode("utf-8")
                 if not data :
-                    print ' \r disconnected from the server\n '
+                    print (' \r disconnected from the server\n ')
                     sys.exit()
                 elif data == "INCORRECT":
-                    print ' \r disconnected from the server\n '
+                    print (' \r disconnected from the server\n ')
                     sys.exit()
                 else :
                     sys.stdout.write(data)
@@ -58,7 +81,7 @@ def main():
             #user entered a message
             else :
                 msg=sys.stdin.readline()
-                s.send(msg)
+                s.send(msg.encode("utf-8"))
                 display(name)
 
 if __name__ == "__main__":
